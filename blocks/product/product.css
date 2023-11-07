@@ -1,0 +1,31 @@
+.product > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-gap: 16px;
+}
+
+.product > ul > li {
+  border: 1px solid var(--highlight-background-color);
+  background-color: var(--background-color)
+}
+
+.product .product-card-body {
+  margin: 16px;
+}
+
+.product .product-card-image {
+  line-height: 0;
+}
+
+.product .product-card-body > *:first-child {
+  margin-top: 0;
+}
+
+.product > ul > li img {
+  width: 100%;
+  aspect-ratio: 4 / 4;
+  object-fit: cover;
+}
