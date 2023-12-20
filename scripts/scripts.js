@@ -13,7 +13,14 @@ import {
   loadCSS,
 } from './aem.js';
 
-const LCP_BLOCKS = []; // add your LCP blocks to the list
+const LCP_BLOCKS = [
+  'product-list-page',
+  'product-details',
+  'commerce-cart',
+  'commerce-checkout',
+  'commerce-account',
+  'commerce-login',
+]; // add your LCP blocks to the list
 
 /**
  * Builds hero block and prepends to main in a new section.
@@ -76,6 +83,31 @@ export function decorateMain(main) {
 async function loadEager(doc) {
   document.documentElement.lang = 'en';
   decorateTemplateAndTheme();
+
+  window.adobeDataLayer = window.adobeDataLayer || [];
+
+  let pageType = 'CMS';
+  if (document.body.querySelector('main .product-details')) {
+    pageType = 'Product';
+  } else if (document.body.querySelector('main .product-list-page')) {
+    pageType = 'Category';
+  } else if (document.body.querySelector('main .commerce-cart')) {
+    pageType = 'Cart';
+  } else if (document.body.querySelector('main .commerce-checkout')) {
+    pageType = 'Checkout';
+  }
+  window.adobeDataLayer.push({
+    pageContext: {
+      pageType,
+      pageName: document.title,
+      eventType: 'visibilityHidden',
+      maxXOffset: 0,
+      maxYOffset: 0,
+      minXOffset: 0,
+      minYOffset: 0,
+    },
+  });
+
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
@@ -124,6 +156,65 @@ function loadDelayed() {
   // eslint-disable-next-line import/no-cycle
   window.setTimeout(() => import('./delayed.js'), 3000);
   // load anything that can be postponed to the latest here
+}
+
+export async function fetchIndex(indexFile, pageSize = 500) {
+  const handleIndex = async (offset) => {
+    const resp = await fetch(`/${indexFile}.json?limit=${pageSize}&offset=${offset}`);
+    const json = await resp.json();
+
+    const newIndex = {
+      complete: (json.limit + json.offset) === json.total,
+      offset: json.offset + pageSize,
+      promise: null,
+      data: [...window.index[indexFile].data, ...json.data],
+    };
+
+    return newIndex;
+  };
+
+  window.index = window.index || {};
+  window.index[indexFile] = window.index[indexFile] || {
+    data: [],
+    offset: 0,
+    complete: false,
+    promise: null,
+  };
+
+  // Return index if already loaded
+  if (window.index[indexFile].complete) {
+    return window.index[indexFile];
+  }
+
+  // Return promise if index is currently loading
+  if (window.index[indexFile].promise) {
+    return window.index[indexFile].promise;
+  }
+
+  window.index[indexFile].promise = handleIndex(window.index[indexFile].offset);
+  const newIndex = await (window.index[indexFile].promise);
+  window.index[indexFile] = newIndex;
+
+  return newIndex;
+}
+
+/**
+ * Loads a fragment.
+ * @param {string} path The path to the fragment
+ * @returns {HTMLElement} The root element of the fragment
+ */
+export async function loadFragment(path) {
+  if (path && path.startsWith('/')) {
+    const resp = await fetch(`${path}.plain.html`);
+    if (resp.ok) {
+      const main = document.createElement('main');
+      main.innerHTML = await resp.text();
+      decorateMain(main);
+      await loadBlocks(main);
+      return main;
+    }
+  }
+  return null;
 }
 
 async function loadPage() {
